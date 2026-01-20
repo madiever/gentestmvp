@@ -1,0 +1,99 @@
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+import { authApi } from '../api/auth.api';
+import { LoginRequest, RegisterRequest, User } from '../types/auth.types';
+
+interface AuthStoreState {
+  user: User | null;
+}
+
+let authState: AuthStoreState = { user: null };
+const listeners = new Set<() => void>();
+
+export const authStore = {
+  getState: (): AuthStoreState => authState,
+  setUser: (user: User | null): void => {
+    authState = { user };
+    listeners.forEach((listener) => listener());
+  },
+  subscribe: (listener: () => void): (() => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+  logout: (): void => {
+    authState = { user: null };
+    listeners.forEach((listener) => listener());
+  }
+};
+
+interface AuthContextValue {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (payload: LoginRequest) => Promise<User>;
+  register: (payload: RegisterRequest) => Promise<User>;
+  logout: () => void;
+  refresh: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const storeState = useSyncExternalStore(authStore.subscribe, authStore.getState, authStore.getState);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const user = await authApi.getMe();
+      authStore.setUser(user);
+    } catch {
+      authStore.setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const login = useCallback(async (payload: LoginRequest) => {
+    const user = await authApi.login(payload);
+    authStore.setUser(user);
+    return user;
+  }, []);
+
+  const register = useCallback(async (payload: RegisterRequest) => {
+    const user = await authApi.register(payload);
+    authStore.setUser(user);
+    return user;
+  }, []);
+
+  const logout = useCallback(() => {
+    authStore.logout();
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user: storeState.user,
+      isAuthenticated: Boolean(storeState.user),
+      isLoading,
+      login,
+      register,
+      logout,
+      refresh
+    }),
+    [storeState.user, isLoading, login, register, logout, refresh]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
+  return context;
+};

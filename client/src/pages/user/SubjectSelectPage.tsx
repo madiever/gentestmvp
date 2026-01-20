@@ -1,0 +1,55 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { subjectApi } from '../../api/subject.api';
+import { Subject } from '../../types/subject.types';
+import { Loader } from '../../components/ui/Loader';
+import { ErrorMessage } from '../../components/ui/ErrorMessage';
+import { getApiErrorMessage } from '../../utils/error';
+
+export const SubjectSelectPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await subjectApi.getSubjects();
+        setSubjects(data);
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="section-title">Выберите предмет</h1>
+      {loading ? <Loader /> : null}
+      {error ? <ErrorMessage message={error} /> : null}
+      {!loading && !error && subjects.length === 0 ? (
+        <div className="card text-sm text-slate-600">Нет доступных предметов.</div>
+      ) : null}
+      {!loading && !error && subjects.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {subjects.map((subject) => (
+            <button
+              key={subject._id}
+              className="card text-left transition hover:border-blue-200 hover:bg-blue-50"
+              onClick={() => navigate('/user/books', { state: { subjectId: subject._id } })}
+            >
+              <h2 className="text-lg font-semibold text-slate-900">{subject.title}</h2>
+              <p className="text-sm text-slate-600">{subject.description || 'Без описания'}</p>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
