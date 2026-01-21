@@ -46,11 +46,11 @@ export default async function vercelHandler(
                         throw error;
                     });
             }
-            
+
             // Таймаут для подключения к БД
             await Promise.race([
                 dbConnectionPromise,
-                new Promise((_, reject) => 
+                new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Database connection timeout')), 5000)
                 )
             ]);
@@ -59,18 +59,44 @@ export default async function vercelHandler(
         // Создаем handler один раз
         if (!handler) {
             handler = serverless(app, {
-                binary: ['image/*', 'application/pdf']
+                binary: ['image/*', 'application/pdf'],
+                request: (req: any, event: any, context: any) => ({
+                    ...req,
+                    ...event,
+                    requestContext: context
+                })
             });
         }
 
         // Обрабатываем через serverless-http
-        const result = await handler(req, res) as Promise<VercelResponse>;
-        clearTimeout(timeout);
-        return result;
+        // Обертываем в Promise для правильной обработки
+        return new Promise((resolve, reject) => {
+            const result = handler(req, res, (err: any) => {
+                clearTimeout(timeout);
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(res);
+                }
+            });
+            
+            // Если handler вернул Promise
+            if (result && typeof result.then === 'function') {
+                result
+                    .then(() => {
+                        clearTimeout(timeout);
+                        resolve(res);
+                    })
+                    .catch((err: any) => {
+                        clearTimeout(timeout);
+                        reject(err);
+                    });
+            }
+        }) as Promise<VercelResponse>;
     } catch (error: any) {
         clearTimeout(timeout);
         console.error('❌ Serverless handler error:', error);
-        
+
         // Проверяем, не отправлен ли уже ответ
         if (!res.headersSent) {
             return res.status(500).json({
@@ -79,7 +105,7 @@ export default async function vercelHandler(
                 error: process.env.NODE_ENV === 'development' ? error.message : 'A server error has occurred'
             });
         }
-        
+
         return res;
     }
 }
