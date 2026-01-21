@@ -18,30 +18,41 @@ export default async function vercelHandler(
     req: VercelRequest,
     res: VercelResponse
 ): Promise<VercelResponse> {
-    // Подключаемся к БД один раз (кешируем соединение)
-    if (!dbConnected) {
-        if (!dbConnectionPromise) {
-            dbConnectionPromise = connectDB()
-                .then(() => {
-                    dbConnected = true;
-                    console.log('✅ MongoDB connected (serverless)');
-                })
-                .catch((error) => {
-                    console.error('❌ MongoDB connection error:', error);
-                    dbConnectionPromise = null;
-                    // В serverless не выходим, просто логируем
-                });
+    try {
+        // Подключаемся к БД один раз (кешируем соединение)
+        if (!dbConnected) {
+            if (!dbConnectionPromise) {
+                dbConnectionPromise = connectDB()
+                    .then(() => {
+                        dbConnected = true;
+                        console.log('✅ MongoDB connected (serverless)');
+                    })
+                    .catch((error) => {
+                        console.error('❌ MongoDB connection error:', error);
+                        dbConnectionPromise = null;
+                        dbConnected = false;
+                        // Пробрасываем ошибку дальше
+                        throw error;
+                    });
+            }
+            await dbConnectionPromise;
         }
-        await dbConnectionPromise;
-    }
 
-    // Создаем handler один раз
-    if (!handler) {
-        handler = serverless(app, {
-            binary: ['image/*', 'application/pdf']
+        // Создаем handler один раз
+        if (!handler) {
+            handler = serverless(app, {
+                binary: ['image/*', 'application/pdf']
+            });
+        }
+
+        // Обрабатываем через serverless-http
+        return handler(req, res) as Promise<VercelResponse>;
+    } catch (error: any) {
+        console.error('❌ Serverless handler error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: process.env.NODE_ENV === 'development' ? error.message : 'A server error has occurred'
         });
     }
-
-    // Обрабатываем через serverless-http
-    return handler(req, res) as Promise<VercelResponse>;
 }

@@ -26,25 +26,28 @@ const app: Application = express();
 // ==================== MIDDLEWARE ====================
 
 // CORS configuration
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+// В production на Vercel разрешаем все origins или используем переменную окружения
+const corsOrigin = process.env.CORS_ORIGIN || (process.env.VERCEL ? '*' : 'http://localhost:5173');
+const allowedOrigins = corsOrigin === '*' 
+  ? true 
+  : corsOrigin.split(',').map((origin) => origin.trim()).filter(Boolean);
 
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
+  origin: allowedOrigins === true 
+    ? true 
+    : (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
+        if (Array.isArray(allowedOrigins) && allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
 
-    callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      },
   credentials: true,
   optionsSuccessStatus: 200
 };
