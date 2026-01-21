@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { authStore } from '../store/auth.store';
 
-const baseURL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api/v1';
+// В production на Vercel используем относительный путь (тот же домен)
+// В development используем полный URL или переменную окружения
+const baseURL = import.meta.env.VITE_API_URL 
+  || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:5111/api/v1');
 
 export const axiosInstance = axios.create({
   baseURL,
