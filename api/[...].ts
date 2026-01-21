@@ -1,14 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import serverless from 'serverless-http';
 import app from '../server/src/app';
 import { connectDB } from '../server/src/config/db';
+import { Request, Response } from 'express';
 
 // Кешируем подключение к БД для serverless
 let dbConnected = false;
 let dbConnectionPromise: Promise<void> | null = null;
-
-// Создаем serverless handler один раз (кешируется между вызовами)
-let handler: ReturnType<typeof serverless> | null = null;
 
 /**
  * Vercel Serverless Function Handler
@@ -62,51 +59,50 @@ export default async function vercelHandler(
             console.log('✅ MongoDB already connected');
         }
 
-        // Создаем handler один раз
-        if (!handler) {
-            console.log('🔧 Creating serverless handler...');
-            handler = serverless(app, {
-                binary: ['image/*', 'application/pdf']
-            });
-        }
-
         console.log('🚀 Processing request through Express...');
 
-        // Обрабатываем через serverless-http
-        // serverless-http возвращает Promise, который резолвится когда ответ отправлен
-        const result = handler(req, res);
+        // Конвертируем Vercel request/response в Express формат
+        const expressReq = req as unknown as Request;
+        const expressRes = res as unknown as Response;
 
-        // Если это Promise, ждем его
-        if (result && typeof result.then === 'function') {
-            console.log('⏳ Waiting for Express response...');
-            await result;
-            console.log('✅ Express response received');
-        } else {
-            console.log('✅ Express handler completed synchronously');
-        }
+        // Обрабатываем через Express напрямую
+        return new Promise<VercelResponse>((resolve, reject) => {
+            // Обработчик завершения ответа
+            const originalEnd = expressRes.end.bind(expressRes);
+            expressRes.end = function (chunk?: any, encoding?: any, cb?: any) {
+                console.log('✅ Express response ended');
+                clearTimeout(timeout);
+                const result = originalEnd(chunk, encoding, cb);
+                resolve(res);
+                return result;
+            };
 
-        // Даем время на отправку ответа
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Убеждаемся, что ответ отправлен
-        if (!res.headersSent) {
-            console.warn('⚠️ Response headers not sent, sending default response');
-            res.status(500).json({
-                success: false,
-                message: 'Response was not sent by Express'
+            // Обработчик ошибок
+            expressRes.on('finish', () => {
+                console.log('✅ Express response finished');
+                clearTimeout(timeout);
+                if (!res.headersSent) {
+                    console.warn('⚠️ Response finished but headers not sent');
+                }
+                resolve(res);
             });
-        } else {
-            console.log('✅ Response headers sent:', res.statusCode);
-            console.log('✅ Response finished:', res.finished);
-            console.log('✅ Response writable ended:', res.writableEnded);
-        }
 
-        clearTimeout(timeout);
-        console.log('✅ Request completed successfully');
-
-        // Не вызываем res.end() явно - это может конфликтовать с serverless-http
-        // Vercel сам завершит ответ когда функция вернет значение
-        return res;
+            // Обрабатываем запрос через Express
+            app(expressReq, expressRes, (err: any) => {
+                if (err) {
+                    console.error('❌ Express error:', err);
+                    clearTimeout(timeout);
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            success: false,
+                            message: 'Internal server error',
+                            error: err.message
+                        });
+                    }
+                    reject(err);
+                }
+            });
+        });
     } catch (error: any) {
         clearTimeout(timeout);
         console.error('❌ Serverless handler error:', error);
