@@ -18,9 +18,12 @@ export default async function vercelHandler(
     req: VercelRequest,
     res: VercelResponse
 ): Promise<VercelResponse> {
+    console.log(`📨 [${req.method}] ${req.url}`);
+    
     // Таймаут для всего запроса (8 секунд для Vercel Hobby плана)
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
+            console.error('⏱️ Request timeout after 8 seconds');
             res.status(504).json({
                 success: false,
                 message: 'Request timeout',
@@ -33,6 +36,7 @@ export default async function vercelHandler(
         // Подключаемся к БД один раз (кешируем соединение)
         if (!dbConnected) {
             if (!dbConnectionPromise) {
+                console.log('🔌 Connecting to MongoDB...');
                 dbConnectionPromise = connectDB()
                     .then(() => {
                         dbConnected = true;
@@ -54,25 +58,35 @@ export default async function vercelHandler(
                     setTimeout(() => reject(new Error('Database connection timeout')), 5000)
                 )
             ]);
+        } else {
+            console.log('✅ MongoDB already connected');
         }
 
         // Создаем handler один раз
         if (!handler) {
+            console.log('🔧 Creating serverless handler...');
             handler = serverless(app, {
                 binary: ['image/*', 'application/pdf']
             });
         }
 
+        console.log('🚀 Processing request through Express...');
+        
         // Обрабатываем через serverless-http
         // serverless-http возвращает Promise, который резолвится когда ответ отправлен
         const result = handler(req, res);
-
+        
         // Если это Promise, ждем его
         if (result && typeof result.then === 'function') {
+            console.log('⏳ Waiting for Express response...');
             await result;
+            console.log('✅ Express response received');
+        } else {
+            console.log('✅ Express handler completed synchronously');
         }
-
+        
         clearTimeout(timeout);
+        console.log('✅ Request completed successfully');
         return res;
     } catch (error: any) {
         clearTimeout(timeout);
