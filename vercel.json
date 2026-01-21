@@ -14,20 +14,14 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/[...].ts"
-    },
-    {
-      "src": "/(.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot))",
-      "dest": "/client/$1"
-    }
-  ],
   "rewrites": [
     {
-      "source": "/((?!api).*)",
-      "destination": "/client/index.html"
+      "source": "/api/(.*)",
+      "destination": "/api/[...].ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/client/$1"
     }
   ]
 }
