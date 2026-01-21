@@ -85,6 +85,9 @@ export default async function vercelHandler(
             console.log('✅ Express handler completed synchronously');
         }
 
+        // Даем время на отправку ответа
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         // Убеждаемся, что ответ отправлен
         if (!res.headersSent) {
             console.warn('⚠️ Response headers not sent, sending default response');
@@ -94,16 +97,15 @@ export default async function vercelHandler(
             });
         } else {
             console.log('✅ Response headers sent:', res.statusCode);
+            console.log('✅ Response finished:', res.finished);
+            console.log('✅ Response writable ended:', res.writableEnded);
         }
 
         clearTimeout(timeout);
         console.log('✅ Request completed successfully');
 
-        // Явно завершаем ответ для Vercel
-        if (!res.writableEnded) {
-            res.end();
-        }
-
+        // Не вызываем res.end() явно - это может конфликтовать с serverless-http
+        // Vercel сам завершит ответ когда функция вернет значение
         return res;
     } catch (error: any) {
         clearTimeout(timeout);
