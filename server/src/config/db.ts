@@ -22,11 +22,12 @@ export const connectDB = async (): Promise<void> => {
       throw new Error('MONGODB_URI is not defined in environment variables');
     }
 
-    // Опции для serverless окружения
+    // Опции для serverless окружения (уменьшенные таймауты для быстрого фейла)
     const options = {
-      maxPoolSize: 10, // Ограничиваем пул соединений для serverless
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
+      maxPoolSize: 5, // Ограничиваем пул соединений для serverless
+      serverSelectionTimeoutMS: 3000, // Уменьшено для быстрого фейла
+      socketTimeoutMS: 10000, // Уменьшено для serverless
+      connectTimeoutMS: 3000, // Таймаут подключения
     };
 
     await mongoose.connect(mongoURI, options);

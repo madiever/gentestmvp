@@ -18,6 +18,17 @@ export default async function vercelHandler(
     req: VercelRequest,
     res: VercelResponse
 ): Promise<VercelResponse> {
+    // Таймаут для всего запроса (8 секунд для Vercel Hobby плана)
+    const timeout = setTimeout(() => {
+        if (!res.headersSent) {
+            res.status(504).json({
+                success: false,
+                message: 'Request timeout',
+                error: 'The request took too long to process'
+            });
+        }
+    }, 8000);
+
     try {
         // Подключаемся к БД один раз (кешируем соединение)
         if (!dbConnected) {
@@ -35,7 +46,14 @@ export default async function vercelHandler(
                         throw error;
                     });
             }
-            await dbConnectionPromise;
+            
+            // Таймаут для подключения к БД
+            await Promise.race([
+                dbConnectionPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+                )
+            ]);
         }
 
         // Создаем handler один раз
@@ -46,13 +64,22 @@ export default async function vercelHandler(
         }
 
         // Обрабатываем через serverless-http
-        return handler(req, res) as Promise<VercelResponse>;
+        const result = await handler(req, res) as Promise<VercelResponse>;
+        clearTimeout(timeout);
+        return result;
     } catch (error: any) {
+        clearTimeout(timeout);
         console.error('❌ Serverless handler error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Internal server error',
-            error: process.env.NODE_ENV === 'development' ? error.message : 'A server error has occurred'
-        });
+        
+        // Проверяем, не отправлен ли уже ответ
+        if (!res.headersSent) {
+            return res.status(500).json({
+                success: false,
+                message: 'Internal server error',
+                error: process.env.NODE_ENV === 'development' ? error.message : 'A server error has occurred'
+            });
+        }
+        
+        return res;
     }
 }
