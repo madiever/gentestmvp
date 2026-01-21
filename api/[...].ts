@@ -66,12 +66,12 @@ export default async function vercelHandler(
         // Обрабатываем через serverless-http
         // serverless-http возвращает Promise, который резолвится когда ответ отправлен
         const result = handler(req, res);
-        
+
         // Если это Promise, ждем его
         if (result && typeof result.then === 'function') {
             await result;
         }
-        
+
         clearTimeout(timeout);
         return res;
     } catch (error: any) {
