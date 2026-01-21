@@ -20,8 +20,12 @@
       "destination": "/api/[...].ts"
     },
     {
+      "source": "/assets/(.*)",
+      "destination": "/client/$1"
+    },
+    {
       "source": "/((?!api|assets|_next).*)",
-      "destination": "/index.html"
+      "destination": "/client/index.html"
     }
   ]
 }
