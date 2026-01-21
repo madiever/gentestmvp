@@ -59,40 +59,21 @@ export default async function vercelHandler(
         // Создаем handler один раз
         if (!handler) {
             handler = serverless(app, {
-                binary: ['image/*', 'application/pdf'],
-                request: (req: any, event: any, context: any) => ({
-                    ...req,
-                    ...event,
-                    requestContext: context
-                })
+                binary: ['image/*', 'application/pdf']
             });
         }
 
         // Обрабатываем через serverless-http
-        // Обертываем в Promise для правильной обработки
-        return new Promise((resolve, reject) => {
-            const result = handler(req, res, (err: any) => {
-                clearTimeout(timeout);
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(res);
-                }
-            });
-            
-            // Если handler вернул Promise
-            if (result && typeof result.then === 'function') {
-                result
-                    .then(() => {
-                        clearTimeout(timeout);
-                        resolve(res);
-                    })
-                    .catch((err: any) => {
-                        clearTimeout(timeout);
-                        reject(err);
-                    });
-            }
-        }) as Promise<VercelResponse>;
+        // serverless-http возвращает Promise, который резолвится когда ответ отправлен
+        const result = handler(req, res);
+        
+        // Если это Promise, ждем его
+        if (result && typeof result.then === 'function') {
+            await result;
+        }
+        
+        clearTimeout(timeout);
+        return res;
     } catch (error: any) {
         clearTimeout(timeout);
         console.error('❌ Serverless handler error:', error);
