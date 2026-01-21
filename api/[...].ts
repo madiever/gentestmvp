@@ -19,7 +19,7 @@ export default async function vercelHandler(
     res: VercelResponse
 ): Promise<VercelResponse> {
     console.log(`📨 [${req.method}] ${req.url}`);
-    
+
     // Таймаут для всего запроса (8 секунд для Vercel Hobby плана)
     const timeout = setTimeout(() => {
         if (!res.headersSent) {
@@ -71,11 +71,11 @@ export default async function vercelHandler(
         }
 
         console.log('🚀 Processing request through Express...');
-        
+
         // Обрабатываем через serverless-http
         // serverless-http возвращает Promise, который резолвится когда ответ отправлен
         const result = handler(req, res);
-        
+
         // Если это Promise, ждем его
         if (result && typeof result.then === 'function') {
             console.log('⏳ Waiting for Express response...');
@@ -84,9 +84,26 @@ export default async function vercelHandler(
         } else {
             console.log('✅ Express handler completed synchronously');
         }
-        
+
+        // Убеждаемся, что ответ отправлен
+        if (!res.headersSent) {
+            console.warn('⚠️ Response headers not sent, sending default response');
+            res.status(500).json({
+                success: false,
+                message: 'Response was not sent by Express'
+            });
+        } else {
+            console.log('✅ Response headers sent:', res.statusCode);
+        }
+
         clearTimeout(timeout);
         console.log('✅ Request completed successfully');
+
+        // Явно завершаем ответ для Vercel
+        if (!res.writableEnded) {
+            res.end();
+        }
+
         return res;
     } catch (error: any) {
         clearTimeout(timeout);
