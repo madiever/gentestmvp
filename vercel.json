@@ -23,10 +23,6 @@
       "destination": "/client/dist/assets/$1"
     },
     {
-      "source": "/(.*\\.(js|css|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot))",
-      "destination": "/client/dist/$1"
-    },
-    {
       "source": "/((?!api|assets|_next).*)",
       "destination": "/client/dist/index.html"
     }
