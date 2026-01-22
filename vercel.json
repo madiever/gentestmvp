@@ -9,21 +9,18 @@
       }
     },
     {
-      "src": "api/[...].ts",
+      "src": "api/index.ts",
       "use": "@vercel/node"
     }
   ],
+
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/[...].ts"
+      "destination": "/api/index.ts"
     },
     {
-      "source": "/assets/(.*)",
-      "destination": "/client/dist/assets/$1"
-    },
-    {
-      "source": "/((?!api|assets|_next).*)",
+      "source": "/(.*)",
       "destination": "/client/dist/index.html"
     }
   ]
