@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "installCommand": "npm install",
   "builds": [
     {
       "src": "client/package.json",
@@ -14,10 +13,14 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/[...].ts"
+      "source": "/api/(.*)",
+      "destination": "/api/[...].ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/client/$1"
     }
   ]
 }
